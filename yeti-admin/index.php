@@ -116,10 +116,17 @@ if ($pass == $pw) {
         
         exit;
     } elseif ($_POST['do'] == 'mkdir') {
-        chdir($file);
+        chdir('../'.$file);
         $mkdirDir = $_POST['name'];
         @mkdir($mkdirDir);
-        $file = "$mkdirDir/.htaccess";
+        // $file = "$mkdirDir/.htaccess";
+    //    file_put_contents($file, "SetHandler default-handler\n<FilesMatch \"\.(php|xml|cgi|php5|php4|php3|php2|phtml|phtm|bat|sh)$\">\ndeny from all\n</FilesMatch>\n<FilesMatch \".*\">\nOrder allow,deny \nDeny from all\n</FilesMatch>\n");
+        exit;
+    } elseif ($_POST['do'] == 'touch') {
+        chdir('../'.$file);
+        $touchFile = $_POST['name'];
+        @touch($touchFile);
+        // $file = "$mkdirDir/.htaccess";
     //    file_put_contents($file, "SetHandler default-handler\n<FilesMatch \"\.(php|xml|cgi|php5|php4|php3|php2|phtml|phtm|bat|sh)$\">\ndeny from all\n</FilesMatch>\n<FilesMatch \".*\">\nOrder allow,deny \nDeny from all\n</FilesMatch>\n");
         exit;
     } elseif ($_POST['do'] == 'upload') {
@@ -154,14 +161,33 @@ if ($pass == $pw) {
         // exec("git add . && git add -u && git commit -m \"Files-Uploaded\"");
         
         exit;
+    } elseif ($_POST['do'] == 'clone') {
+    $newfile = $_POST['name'];
+    
+    $thisDir = explode('/', $file);
+    array_pop($thisDir);
+    $thisDir = implode('/', $thisDir);
+    $newfile = $thisDir . "/" . $newfile;
+    
+    copy('../'.$file, '../'.$newfile);
+    
+    // Commit file Creation
+    // $thisDir = explode('/', $file);
+    //     $thisDir = $thisDir[0];
+    //     chdir("/var/www/html/wsite/sites/".$thisDir);
+    //     exec("git add -A && git add -u && git commit -m \"File at $file Created\"");
+    //     error_log($thisDir);
+    
+    exit;
     } elseif ($_GET['do'] == 'download') {
-        $filename = basename($file);
-        header('Content-Type: ' . mime_content_type($file));
-        header('Content-Length: '. filesize($file));
+        $file = $_GET['file'] ?: '.';
+        $filename = basename('../'.$file);
+        header('Content-Type: ' . mime_content_type('../'.$file));
+        header('Content-Length: '. filesize('../'.$file));
         header(sprintf('Content-Disposition: attachment; filename=%s',
             strpos('MSIE',$_SERVER['HTTP_REFERER']) ? rawurlencode($filename) : "\"$filename\"" ));
         ob_flush();
-        readfile($file);
+        readfile('../'.$file);
         exit;
     }
     
@@ -169,7 +195,7 @@ if ($pass == $pw) {
 
 }
 
-
+if ($_GET['do'] != 'download') {
 ?>
 <!DOCTYPE html>
 <html>
@@ -276,7 +302,7 @@ if ($pass == $pw) {
           <i class="ion-code-working" style="padding-right:7.5px !important"></i>
           Edit Code
         </a>
-        <a class="yeti-context-menu-button download">
+        <a class="yeti-context-menu-button download" target="_blank">
           <i class="ion-ios-download-outline" style="padding-right:11px !important"></i>
           Download
         </a>
@@ -427,11 +453,15 @@ if ($pass == $pw) {
                 var pn = pathName.split('.././').join('');
                 if (pathName.indexOf('.html') !== -1 || pathName.indexOf('.htm') !== -1) {
                     $('.yeti-context-menu-button.edit-code').removeClass('yeti-hidden');
+                    pn = pn.split('?')[0];
                     $('.yeti-context-menu-button.edit-code').attr('href', '../editor.php?path=' + pn);
                 }
                 $('.yeti-context-menu-button').attr('data-path', pn);
                 
-                $('.yeti-context-menu-button.rename, .yeti-context-menu-button.delete').removeClass('yeti-hidden');
+                if ($(this).hasClass('files'))
+                    $('.yeti-context-menu-button.download').attr('href', '?do=download&pw='+localStorage.getItem('_yeti_pw')+'&file='+encodeURIComponent(pn));
+                
+                $('.yeti-context-menu-button.rename, .yeti-context-menu-button.delete, .yeti-context-menu-button.new-folder, .yeti-context-menu-button.new-file, .yeti-context-menu-button.clone-file, .yeti-context-menu-button.download').removeClass('yeti-hidden');
                 $('.yeti-context-menu').show();
                 
             });
@@ -450,8 +480,8 @@ if ($pass == $pw) {
                     callback: function(value) {
                         var rename = (path || '.') + "/" + value;
                         $.post("", { do: 'rename', file: pathName, rename: rename, pw: localStorage.getItem('_yeti_pw') }, function (response) {
-                            loadFiles();
-                        },'json');
+                            window.location.reload();
+                        }, 'json');
                     }
                 });
             });
@@ -459,10 +489,63 @@ if ($pass == $pw) {
             $('.yeti-context-menu-button.delete').click(function () {
                 var pathName = $(this).attr('data-path').split('../').join('').split('./').join('');
                 $.post("", { 'do':'delete', file: pathName, pw: localStorage.getItem('_yeti_pw') } , function (response) {
-                    loadFiles();
-                },'json');
+                    window.location.reload();
+                }, 'json');
+            });
+            
+            $('.yeti-context-menu-button.new-folder').click(function () {
+                vex.dialog.prompt({
+                    message: 'Create a New Folder',
+                    callback: function(value) {
+                        if (!value) return;
+                        // console.log('mkdir', value);
+                        var hashval = window.location.hash.substr(1);
+                        $.post('?',{ do:'mkdir', name: value, file: hashval, pw: localStorage.getItem('_yeti_pw') }, function (data) {
+                            window.location.reload();
+                        }, 'json');
+                    }
+                });
+            });
+            
+            $('.yeti-context-menu-button.new-file').click(function () {
+                vex.dialog.prompt({
+                    message: 'Create a New File',
+                    callback: function (value) {
+                        if (!value) return;
+                        // console.log('mkdir', value);
+                        var hashval = window.location.hash.substr(1);
+                        $.post('?',{ do:'touch', name: value, file: hashval, pw: localStorage.getItem('_yeti_pw') }, function (data) {
+                            window.location.reload();
+                        }, 'json');
+                    }
+                });
+            });
+            
+            
+            $('.yeti-context-menu-button.clone-file').click(function () {
+                var pathName = $(this).attr('data-path').split('../').join('').split('./').join('');
+                vex.dialog.prompt({
+                    message: 'Cloned file name',
+                    callback: function (value) {
+                        if (!value) return;
+                        
+                        var fileNameArray = pathName.split('.');
+                        var fileExt = fileNameArray.pop();
+                        
+                        // value = value.trim().toLowerCase().replace(/[|&;$%@"<>()+,]/g, "").replace(/(\s+)/g, '-');
+                        // if (fileExt && fileExt.length < 8 && inputValue.indexOf('.'+fileExt) < 1) inputValue += '.' + fileExt;
+                        
+                        var hashval = window.location.hash.substr(1);
+                        $.post("",{ do: 'clone', file: pathName, name: value, pw: localStorage.getItem('_yeti_pw')},function (response) {
+                            window.location.reload();
+                        }, 'json');
+                    }
+                });
             });
         });
     </script>
 </body>
 </html>
+<?php
+}
+?>
