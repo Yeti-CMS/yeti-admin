@@ -1,6 +1,8 @@
 # Yeti Admin
 This is the Admin panel project for Yeti CMS
 
+<img src="http://g.recordit.co/9IYxQmlnU7.gif">
+
 ## Requirements
 - PHP5
 - Apache
